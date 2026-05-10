@@ -34,8 +34,14 @@ docker run -d -p 1566:1566 \
 - `AUTH_USERS`：认证用户，格式为 `user1:pass1,user2:pass2`
 - `AUTH_TOKEN_EXPIRY`：JWT 有效期，单位小时（默认值：24）
 - `AUTH_JWT_SECRET`：JWT 签名密钥，生产环境建议显式配置固定强随机字符串
+- `PANSOU_AUTH_ENABLED`：是否启用上游 pansou 认证（默认值：false）
+- `PANSOU_AUTH_USERNAME`：上游 pansou 登录用户名
+- `PANSOU_AUTH_PASSWORD`：上游 pansou 登录密码
+- `PANSOU_AUTH_TOKEN`：可选，上游 pansou 固定 token；配置后优先使用，不再自动登录
 
 启用认证时必须配置 `AUTH_USERS` 和固定的 `AUTH_JWT_SECRET`。本地运行会自动加载项目根目录下的 `.env` 文件。
+
+`AUTH_*` 用于保护本代理服务，`PANSOU_AUTH_*` 用于本代理访问上游 pansou。上游 pansou 开启认证时，推荐配置 `PANSOU_AUTH_ENABLED=true`、`PANSOU_AUTH_USERNAME`、`PANSOU_AUTH_PASSWORD`，代理会自动登录并缓存 token；上游返回 401 时会自动刷新一次。
 
 ### 本地部署
 

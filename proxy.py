@@ -4,9 +4,9 @@ import logging
 import httpx
 from flask import Blueprint, jsonify, make_response, request
 
-from auth import get_forward_auth_headers
 from config import Config
 from pancheck import filter_search_results_sync
+from pansou_auth import get_pansou_auth_headers, is_unauthorized_error
 
 
 logger = logging.getLogger(__name__)
@@ -86,9 +86,39 @@ def make_api_request(client, url, method="POST", data=None, params=None, headers
             f"{response.content[:500] if hasattr(response, 'content') else 'No content'}..."
         )
         raise ValueError("API返回的内容格式错误")
+    except httpx.HTTPStatusError as e:
+        if e.response is not None and e.response.status_code == 401:
+            raise
+        logger.error(f"API错误: {str(e)}")
+        raise
     except Exception as e:
         logger.error(f"API错误: {str(e)}")
         raise e
+
+
+def make_pansou_api_request(client, url, method="POST", data=None, params=None):
+    """发起上游 pansou 请求；token 过期时自动刷新重试一次。"""
+    try:
+        return make_api_request(
+            client,
+            url,
+            method=method,
+            data=data,
+            params=params,
+            headers=get_pansou_auth_headers(client),
+        )
+    except Exception as e:
+        if Config.PANSOU_AUTH_ENABLED and not Config.PANSOU_AUTH_TOKEN and is_unauthorized_error(e):
+            logger.info("上游 pansou token 失效，刷新后重试")
+            return make_api_request(
+                client,
+                url,
+                method=method,
+                data=data,
+                params=params,
+                headers=get_pansou_auth_headers(client, force_refresh=True),
+            )
+        raise
 
 
 def parse_json_response(response):
@@ -116,12 +146,11 @@ def proxy_search():
 
     with httpx.Client(timeout=Config.CLIENT_TIMEOUT) as client:
         try:
-            search_data = make_api_request(
+            search_data = make_pansou_api_request(
                 client,
                 f"{Config.SEARCH_API_URL}/api/search",
                 method="POST",
                 data=body,
-                headers=get_forward_auth_headers(),
             )
         except ConnectionError as e:
             logger.error(str(e))
@@ -153,12 +182,11 @@ def proxy_search_get():
 
     with httpx.Client(timeout=Config.CLIENT_TIMEOUT) as client:
         try:
-            search_data = make_api_request(
+            search_data = make_pansou_api_request(
                 client,
                 f"{Config.SEARCH_API_URL}/api/search",
                 method="GET",
                 params=search_params,
-                headers=get_forward_auth_headers(),
             )
         except ConnectionError as e:
             logger.error(str(e))
@@ -188,7 +216,7 @@ def health():
     """健康检查接口。"""
     with httpx.Client(timeout=Config.CLIENT_TIMEOUT) as client:
         try:
-            health_data = make_api_request(client, f"{Config.SEARCH_API_URL}/api/health", method="GET")
+            health_data = make_pansou_api_request(client, f"{Config.SEARCH_API_URL}/api/health", method="GET")
             if isinstance(health_data, dict):
                 health_data["auth_enabled"] = Config.AUTH_ENABLED
             response = make_response(jsonify(health_data))

@@ -13,7 +13,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # 复制应用代码
-COPY main.py config.py auth.py proxy.py pancheck.py ./
+COPY main.py config.py auth.py proxy.py pancheck.py pansou_auth.py ./
 
 # 创建非root用户运行应用
 RUN groupadd -r appuser && useradd -r -g appuser appuser

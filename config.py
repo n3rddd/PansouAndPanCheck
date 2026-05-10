@@ -28,6 +28,12 @@ class Config:
     AUTH_TOKEN_EXPIRY = int(os.getenv("AUTH_TOKEN_EXPIRY", 24))  # 小时
     AUTH_JWT_SECRET = os.getenv("AUTH_JWT_SECRET", "")
 
+    # 上游 pansou 认证配置，代理访问 pansou 服务时使用
+    PANSOU_AUTH_ENABLED = os.getenv("PANSOU_AUTH_ENABLED", "false").lower() in ("true", "1", "yes", "on")
+    PANSOU_AUTH_USERNAME = os.getenv("PANSOU_AUTH_USERNAME", "")
+    PANSOU_AUTH_PASSWORD = os.getenv("PANSOU_AUTH_PASSWORD", "")
+    PANSOU_AUTH_TOKEN = os.getenv("PANSOU_AUTH_TOKEN", "")
+
     # HTTP 客户端配置
     CLIENT_TIMEOUT = float(os.getenv("CLIENT_TIMEOUT", 60.0))  # 秒
     MAX_RETRIES = int(os.getenv("MAX_RETRIES", 3))
@@ -89,6 +95,14 @@ class Config:
             raise ValueError("启用 AUTH_ENABLED 时必须配置 AUTH_USERS")
         if cls.AUTH_ENABLED and not cls.AUTH_JWT_SECRET:
             raise ValueError("启用 AUTH_ENABLED 时必须配置固定的 AUTH_JWT_SECRET")
+        if cls.PANSOU_AUTH_ENABLED:
+            has_static_token = bool(cls.PANSOU_AUTH_TOKEN)
+            has_login_credentials = bool(cls.PANSOU_AUTH_USERNAME and cls.PANSOU_AUTH_PASSWORD)
+            if not has_static_token and not has_login_credentials:
+                raise ValueError(
+                    "启用 PANSOU_AUTH_ENABLED 时必须配置 PANSOU_AUTH_TOKEN "
+                    "或 PANSOU_AUTH_USERNAME/PANSOU_AUTH_PASSWORD"
+                )
 
     @classmethod
     def ensure_runtime_defaults(cls):

@@ -4,8 +4,9 @@ from unittest.mock import patch
 import httpx
 import main
 import pancheck
+import pansou_auth
 from config import Config
-from proxy import get_query_param_pairs, make_api_request, parse_request_body
+from proxy import get_query_param_pairs, make_api_request, make_pansou_api_request, parse_request_body
 
 
 class ConfigTests(unittest.TestCase):
@@ -25,6 +26,26 @@ class ConfigTests(unittest.TestCase):
             Config.AUTH_ENABLED = original_enabled
             Config.AUTH_USERS_RAW = original_users
             Config.AUTH_JWT_SECRET = original_secret
+
+    def test_pansou_auth_requires_token_or_credentials(self):
+        original_enabled = Config.PANSOU_AUTH_ENABLED
+        original_username = Config.PANSOU_AUTH_USERNAME
+        original_password = Config.PANSOU_AUTH_PASSWORD
+        original_token = Config.PANSOU_AUTH_TOKEN
+
+        try:
+            Config.PANSOU_AUTH_ENABLED = True
+            Config.PANSOU_AUTH_USERNAME = ""
+            Config.PANSOU_AUTH_PASSWORD = ""
+            Config.PANSOU_AUTH_TOKEN = ""
+
+            with self.assertRaises(ValueError):
+                Config.validate()
+        finally:
+            Config.PANSOU_AUTH_ENABLED = original_enabled
+            Config.PANSOU_AUTH_USERNAME = original_username
+            Config.PANSOU_AUTH_PASSWORD = original_password
+            Config.PANSOU_AUTH_TOKEN = original_token
 
 
 class RequestParsingTests(unittest.TestCase):
@@ -58,6 +79,96 @@ class ApiResponseParsingTests(unittest.TestCase):
 
         self.assertEqual(data["code"], 0)
         self.assertIn("bad", data["message"])
+
+
+class PansouAuthTests(unittest.TestCase):
+    def setUp(self):
+        self.original_enabled = Config.PANSOU_AUTH_ENABLED
+        self.original_username = Config.PANSOU_AUTH_USERNAME
+        self.original_password = Config.PANSOU_AUTH_PASSWORD
+        self.original_token = Config.PANSOU_AUTH_TOKEN
+        self.original_search_url = Config.SEARCH_API_URL
+        Config.PANSOU_AUTH_ENABLED = True
+        Config.PANSOU_AUTH_USERNAME = "WebAdmin"
+        Config.PANSOU_AUTH_PASSWORD = "PansouWeb"
+        Config.PANSOU_AUTH_TOKEN = ""
+        Config.SEARCH_API_URL = "http://pansou.test"
+        pansou_auth.reset_cached_pansou_token()
+
+    def tearDown(self):
+        Config.PANSOU_AUTH_ENABLED = self.original_enabled
+        Config.PANSOU_AUTH_USERNAME = self.original_username
+        Config.PANSOU_AUTH_PASSWORD = self.original_password
+        Config.PANSOU_AUTH_TOKEN = self.original_token
+        Config.SEARCH_API_URL = self.original_search_url
+        pansou_auth.reset_cached_pansou_token()
+
+    def test_static_pansou_token_is_used(self):
+        Config.PANSOU_AUTH_TOKEN = "static-token"
+
+        headers = pansou_auth.get_pansou_auth_headers(client=None)
+
+        self.assertEqual(headers, {"Authorization": "Bearer static-token"})
+
+    def test_pansou_login_token_is_cached(self):
+        class DummyClient:
+            def __init__(self):
+                self.login_count = 0
+
+            def post(self, url, json=None, headers=None):
+                self.login_count += 1
+                return httpx.Response(
+                    200,
+                    json={"code": 0, "data": {"token": "login-token", "expires_in": 3600}},
+                    request=httpx.Request("POST", url),
+                )
+
+        client = DummyClient()
+
+        first = pansou_auth.get_pansou_auth_headers(client)
+        second = pansou_auth.get_pansou_auth_headers(client)
+
+        self.assertEqual(first, {"Authorization": "Bearer login-token"})
+        self.assertEqual(second, {"Authorization": "Bearer login-token"})
+        self.assertEqual(client.login_count, 1)
+
+    def test_pansou_token_refreshes_once_on_401(self):
+        class DummyClient:
+            def __init__(self):
+                self.get_headers = []
+                self.login_count = 0
+
+            def get(self, url, params=None, headers=None):
+                self.get_headers.append(headers)
+                if len(self.get_headers) == 1:
+                    return httpx.Response(
+                        401,
+                        json={"code": 401, "message": "expired"},
+                        request=httpx.Request("GET", url),
+                    )
+                return httpx.Response(
+                    200,
+                    json={"code": 0, "message": "ok", "data": {}},
+                    request=httpx.Request("GET", url),
+                )
+
+            def post(self, url, json=None, headers=None):
+                self.login_count += 1
+                return httpx.Response(
+                    200,
+                    json={"code": 0, "data": {"token": "fresh-token", "expires_in": 3600}},
+                    request=httpx.Request("POST", url),
+                )
+
+        client = DummyClient()
+        pansou_auth.set_cached_pansou_token("expired-token", cache_seconds=3600)
+
+        data = make_pansou_api_request(client, "http://pansou.test/api/health", method="GET")
+
+        self.assertEqual(data["code"], 0)
+        self.assertEqual(client.login_count, 1)
+        self.assertEqual(client.get_headers[0], {"Authorization": "Bearer expired-token"})
+        self.assertEqual(client.get_headers[1], {"Authorization": "Bearer fresh-token"})
 
 
 class AuthTests(unittest.TestCase):

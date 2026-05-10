@@ -11,6 +11,7 @@ PansouAndPanCheck/
 ├── main.py                 # 应用入口和 Flask app 创建
 ├── auth.py                 # 认证路由、JWT 与鉴权中间件
 ├── proxy.py                # pansou 搜索与健康检查代理
+├── pansou_auth.py          # 上游 pansou 登录、token 缓存和刷新
 ├── pancheck.py             # PanCheck 调用、链接检测与搜索结果过滤
 ├── config.py               # 配置管理模块
 ├── tests/                  # 基础单元测试
@@ -71,8 +72,14 @@ PansouAndPanCheck/
 | `AUTH_USERS` | 空 | 认证用户，格式为 `user1:pass1,user2:pass2` |
 | `AUTH_TOKEN_EXPIRY` | `24` | JWT 有效期（小时） |
 | `AUTH_JWT_SECRET` | 空 | JWT 签名密钥 |
+| `PANSOU_AUTH_ENABLED` | `false` | 是否启用上游 pansou 认证 |
+| `PANSOU_AUTH_USERNAME` | 空 | 上游 pansou 登录用户名 |
+| `PANSOU_AUTH_PASSWORD` | 空 | 上游 pansou 登录密码 |
+| `PANSOU_AUTH_TOKEN` | 空 | 可选，上游 pansou 固定 token |
 
 启用认证时必须配置固定的 `AUTH_JWT_SECRET`，否则服务启动会失败，避免重启或多进程部署后 token 无法验证。
+
+`AUTH_*` 用于保护本代理服务，`PANSOU_AUTH_*` 用于代理访问上游 pansou。启用上游认证时，配置用户名/密码后代理会自动登录并缓存 token，也支持直接配置固定 token。
 
 ### 支持的网盘平台
 
