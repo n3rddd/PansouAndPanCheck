@@ -1,0 +1,14 @@
+.git
+.github
+.idea
+__pycache__
+*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.venv
+venv
+.env
+.env.*
+tests
+PROJECT_STRUCTURE.md
