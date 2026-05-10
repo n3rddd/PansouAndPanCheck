@@ -1,3 +1,5 @@
+#重新编译支持ARM64，感谢不懂和L原作者。 douniwan819/pansou-pancheck:latest
+
 # PansouAndPanCheck
 
 一个整合了 [pansou](https://github.com/fish2018/pansou) 搜索服务和 [PanCheck](https://github.com/Lampon/PanCheck) 链接有效性校验的代理服务。
@@ -67,3 +69,15 @@ gunicorn -k gevent -w 2 -b 0.0.0.0:1566 main:app
 - [pansou](https://github.com/fish2018/pansou)
 - [pansou-web](https://github.com/fish2018/pansou-web)
 - [PanCheck](https://github.com/Lampon/PanCheck)
+
+- ## Star History
+
+[<image-card alt="Star History Chart" src="https://api.star-history.com/svg?repos=Silent1566/PansouAndPanCheck&type=Date" ></image-card>](https://star-history.com/#Silent1566/PansouAndPanCheck&Date)
+
+<!-- 或者更推荐带暗色适配的写法 -->
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Silent1566/PansouAndPanCheck&type=Date&theme=dark" />
+  <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Silent1566/PansouAndPanCheck&type=Date" />
+  <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Silent1566/PansouAndPanCheck&type=Date" />
+</picture>
+
