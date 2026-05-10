@@ -1,10 +1,11 @@
 import unittest
 from unittest.mock import patch
 
+import httpx
 import main
 import pancheck
 from config import Config
-from proxy import get_query_param_pairs, parse_request_body
+from proxy import get_query_param_pairs, make_api_request, parse_request_body
 
 
 class ConfigTests(unittest.TestCase):
@@ -41,6 +42,22 @@ class RequestParsingTests(unittest.TestCase):
                 get_query_param_pairs(),
                 [("channels", "a"), ("channels", "b"), ("kw", "abc")],
             )
+
+
+class ApiResponseParsingTests(unittest.TestCase):
+    def test_invalid_utf8_response_is_decoded_lossily(self):
+        class DummyClient:
+            def get(self, url, params=None, headers=None):
+                return httpx.Response(
+                    200,
+                    content=b'{"code":0,"message":"bad \xff bytes","data":{}}',
+                    request=httpx.Request("GET", url),
+                )
+
+        data = make_api_request(DummyClient(), "http://example.test/api", method="GET")
+
+        self.assertEqual(data["code"], 0)
+        self.assertIn("bad", data["message"])
 
 
 class AuthTests(unittest.TestCase):

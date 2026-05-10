@@ -73,7 +73,7 @@ def make_api_request(client, url, method="POST", data=None, params=None, headers
             response = client.get(url, params=params, headers=headers)
 
         response.raise_for_status()
-        return response.json()
+        return parse_json_response(response)
     except httpx.ConnectError:
         logger.error(f"无法连接到API: {url}")
         raise ConnectionError(f"无法连接到API: {url}")
@@ -89,6 +89,17 @@ def make_api_request(client, url, method="POST", data=None, params=None, headers
     except Exception as e:
         logger.error(f"API错误: {str(e)}")
         raise e
+
+
+def parse_json_response(response):
+    """解析 JSON 响应；上游偶发非法 UTF-8 时使用替换字符容错。"""
+    try:
+        return response.json()
+    except UnicodeDecodeError:
+        logger.warning("API返回内容包含非法UTF-8字节，已使用替换字符容错解析")
+        encoding = response.encoding or "utf-8"
+        content = response.content.decode(encoding, errors="replace")
+        return json.loads(content)
 
 
 @proxy_bp.route('/api/search', methods=['POST'])
