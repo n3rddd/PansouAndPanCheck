@@ -76,10 +76,11 @@ PansouAndPanCheck/
 | `PANSOU_AUTH_USERNAME` | 空 | 上游 pansou 登录用户名 |
 | `PANSOU_AUTH_PASSWORD` | 空 | 上游 pansou 登录密码 |
 | `PANSOU_AUTH_TOKEN` | 空 | 可选，上游 pansou 固定 token |
+| `PANSOU_AUTH_LOGIN_URL` | 空 | 可选，自定义上游登录接口路径或完整 URL |
 
 启用认证时必须配置固定的 `AUTH_JWT_SECRET`，否则服务启动会失败，避免重启或多进程部署后 token 无法验证。
 
-`AUTH_*` 用于保护本代理服务，`PANSOU_AUTH_*` 用于代理访问上游 pansou。启用上游认证时，配置用户名/密码后代理会自动登录并缓存 token，也支持直接配置固定 token。
+`AUTH_*` 用于保护本代理服务，`PANSOU_AUTH_*` 用于代理访问上游 pansou。启用上游认证时，配置用户名/密码后代理会自动登录并缓存 token，也支持直接配置固定 token。默认优先尝试 `/api/auth/login`，若返回 404 会自动回退到 `/api/login`；如你的部署使用了自定义路由，可设置 `PANSOU_AUTH_LOGIN_URL`。
 
 ### 支持的网盘平台
 

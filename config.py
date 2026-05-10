@@ -33,6 +33,7 @@ class Config:
     PANSOU_AUTH_USERNAME = os.getenv("PANSOU_AUTH_USERNAME", "")
     PANSOU_AUTH_PASSWORD = os.getenv("PANSOU_AUTH_PASSWORD", "")
     PANSOU_AUTH_TOKEN = os.getenv("PANSOU_AUTH_TOKEN", "")
+    PANSOU_AUTH_LOGIN_URL = os.getenv("PANSOU_AUTH_LOGIN_URL", "").strip()
 
     # HTTP 客户端配置
     CLIENT_TIMEOUT = float(os.getenv("CLIENT_TIMEOUT", 60.0))  # 秒

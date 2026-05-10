@@ -87,11 +87,13 @@ class PansouAuthTests(unittest.TestCase):
         self.original_username = Config.PANSOU_AUTH_USERNAME
         self.original_password = Config.PANSOU_AUTH_PASSWORD
         self.original_token = Config.PANSOU_AUTH_TOKEN
+        self.original_login_url = Config.PANSOU_AUTH_LOGIN_URL
         self.original_search_url = Config.SEARCH_API_URL
         Config.PANSOU_AUTH_ENABLED = True
         Config.PANSOU_AUTH_USERNAME = "WebAdmin"
         Config.PANSOU_AUTH_PASSWORD = "PansouWeb"
         Config.PANSOU_AUTH_TOKEN = ""
+        Config.PANSOU_AUTH_LOGIN_URL = ""
         Config.SEARCH_API_URL = "http://pansou.test"
         pansou_auth.reset_cached_pansou_token()
 
@@ -100,6 +102,7 @@ class PansouAuthTests(unittest.TestCase):
         Config.PANSOU_AUTH_USERNAME = self.original_username
         Config.PANSOU_AUTH_PASSWORD = self.original_password
         Config.PANSOU_AUTH_TOKEN = self.original_token
+        Config.PANSOU_AUTH_LOGIN_URL = self.original_login_url
         Config.SEARCH_API_URL = self.original_search_url
         pansou_auth.reset_cached_pansou_token()
 
@@ -131,6 +134,59 @@ class PansouAuthTests(unittest.TestCase):
         self.assertEqual(first, {"Authorization": "Bearer login-token"})
         self.assertEqual(second, {"Authorization": "Bearer login-token"})
         self.assertEqual(client.login_count, 1)
+
+    def test_pansou_login_falls_back_to_legacy_route_when_auth_path_404(self):
+        class DummyClient:
+            def __init__(self):
+                self.login_urls = []
+
+            def post(self, url, json=None, headers=None):
+                self.login_urls.append(url)
+                if url.endswith("/api/auth/login"):
+                    return httpx.Response(
+                        404,
+                        json={"code": 404, "message": "not found"},
+                        request=httpx.Request("POST", url),
+                    )
+                return httpx.Response(
+                    200,
+                    json={"code": 0, "data": {"token": "legacy-token", "expires_in": 3600}},
+                    request=httpx.Request("POST", url),
+                )
+
+        client = DummyClient()
+
+        headers = pansou_auth.get_pansou_auth_headers(client)
+
+        self.assertEqual(headers, {"Authorization": "Bearer legacy-token"})
+        self.assertEqual(
+            client.login_urls,
+            [
+                "http://pansou.test/api/auth/login",
+                "http://pansou.test/api/login",
+            ],
+        )
+
+    def test_custom_pansou_login_url_is_supported(self):
+        class DummyClient:
+            def __init__(self):
+                self.login_urls = []
+
+            def post(self, url, json=None, headers=None):
+                self.login_urls.append(url)
+                return httpx.Response(
+                    200,
+                    json={"code": 0, "data": {"token": "custom-token", "expires_in": 3600}},
+                    request=httpx.Request("POST", url),
+                )
+
+        Config.PANSOU_AUTH_LOGIN_URL = "/custom/login"
+        client = DummyClient()
+
+        headers = pansou_auth.get_pansou_auth_headers(client)
+
+        self.assertEqual(headers, {"Authorization": "Bearer custom-token"})
+        self.assertEqual(client.login_urls, ["http://pansou.test/custom/login"])
 
     def test_pansou_token_refreshes_once_on_401(self):
         class DummyClient:

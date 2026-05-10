@@ -60,22 +60,65 @@ def set_cached_pansou_token(token, cache_seconds):
 
 def login_to_pansou(client):
     """调用上游 pansou 登录接口。"""
-    login_url = f"{Config.SEARCH_API_URL}/api/auth/login"
-    response = client.post(
-        login_url,
-        json={
-            "username": Config.PANSOU_AUTH_USERNAME,
-            "password": Config.PANSOU_AUTH_PASSWORD,
-        },
-    )
-    response.raise_for_status()
-    data = response.json()
-    token, expires_in = extract_token_from_login_response(data)
-    if not token:
-        raise ValueError("上游 pansou 登录成功但未返回 token")
+    payload = {
+        "username": Config.PANSOU_AUTH_USERNAME,
+        "password": Config.PANSOU_AUTH_PASSWORD,
+    }
+    login_urls = get_pansou_login_urls()
+    last_error = None
 
-    logger.info("上游 pansou 认证成功，token 已缓存")
-    return token, expires_in
+    for login_url in login_urls:
+        try:
+            response = client.post(login_url, json=payload)
+            response.raise_for_status()
+            data = response.json()
+            token, expires_in = extract_token_from_login_response(data)
+            if not token:
+                raise ValueError("上游 pansou 登录成功但未返回 token")
+
+            logger.info("上游 pansou 认证成功，token 已缓存，接口: %s", login_url)
+            return token, expires_in
+        except httpx.HTTPStatusError as exc:
+            last_error = exc
+            if should_try_next_login_url(exc, login_url):
+                logger.info("上游登录接口不存在，尝试下一个候选路径: %s", login_url)
+                continue
+            raise
+
+    if last_error:
+        raise last_error
+    raise ValueError("未找到可用的上游 pansou 登录接口")
+
+
+def get_pansou_login_urls():
+    """返回上游 pansou 登录接口候选路径。"""
+    if Config.PANSOU_AUTH_LOGIN_URL:
+        return [normalize_pansou_login_url(Config.PANSOU_AUTH_LOGIN_URL)]
+
+    base_url = Config.SEARCH_API_URL.rstrip("/")
+    return [
+        f"{base_url}/api/auth/login",
+        f"{base_url}/api/login",
+    ]
+
+
+def normalize_pansou_login_url(login_url):
+    """将自定义登录地址规范化为可请求的完整 URL。"""
+    if login_url.startswith(("http://", "https://")):
+        return login_url
+    if not login_url.startswith("/"):
+        login_url = f"/{login_url}"
+    return f"{Config.SEARCH_API_URL.rstrip('/')}{login_url}"
+
+
+def should_try_next_login_url(error, login_url):
+    """仅在默认候选路径 404 时继续尝试下一个登录地址。"""
+    return (
+        not Config.PANSOU_AUTH_LOGIN_URL
+        and error.response is not None
+        and error.response.status_code == 404
+        and login_url.endswith("/api/auth/login")
+    )
 
 
 def extract_token_from_login_response(data):

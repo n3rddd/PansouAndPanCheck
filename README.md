@@ -38,10 +38,11 @@ docker run -d -p 1566:1566 \
 - `PANSOU_AUTH_USERNAME`：上游 pansou 登录用户名
 - `PANSOU_AUTH_PASSWORD`：上游 pansou 登录密码
 - `PANSOU_AUTH_TOKEN`：可选，上游 pansou 固定 token；配置后优先使用，不再自动登录
+- `PANSOU_AUTH_LOGIN_URL`：可选，自定义上游登录接口路径或完整 URL；默认优先尝试 `/api/auth/login`，其次回退 `/api/login`
 
 启用认证时必须配置 `AUTH_USERS` 和固定的 `AUTH_JWT_SECRET`。本地运行会自动加载项目根目录下的 `.env` 文件。
 
-`AUTH_*` 用于保护本代理服务，`PANSOU_AUTH_*` 用于本代理访问上游 pansou。上游 pansou 开启认证时，推荐配置 `PANSOU_AUTH_ENABLED=true`、`PANSOU_AUTH_USERNAME`、`PANSOU_AUTH_PASSWORD`，代理会自动登录并缓存 token；上游返回 401 时会自动刷新一次。
+`AUTH_*` 用于保护本代理服务，`PANSOU_AUTH_*` 用于本代理访问上游 pansou。上游 pansou 开启认证时，推荐配置 `PANSOU_AUTH_ENABLED=true`、`PANSOU_AUTH_USERNAME`、`PANSOU_AUTH_PASSWORD`，代理会自动登录并缓存 token；默认兼容 `/api/auth/login` 和旧版 `/api/login`，上游返回 401 时会自动刷新一次。若你的部署使用了自定义登录路由，可额外设置 `PANSOU_AUTH_LOGIN_URL`。
 
 ### 本地部署
 
